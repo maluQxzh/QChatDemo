@@ -1,0 +1,8 @@
+{
+  "name": "QChat",
+  "description": "一个最小可用的安全聊天应用，具备实时消息、本地持久化功能，拥有适合 Electron 打包的健壮架构。",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
