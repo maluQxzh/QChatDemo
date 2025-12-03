@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Conversation, User, FriendRequest } from '../types';
+import { Conversation, User, FriendRequest, MessageType } from '../types';
 import { storageService } from '../services/storageService';
 import { socketService } from '../services/socketService';
 import ChatInterface from '../components/ChatInterface';
@@ -101,7 +101,21 @@ const Dashboard: React.FC = () => {
   // Effect 2: Listeners that depend on UI state (activeConversationId, conversations)
   useEffect(() => {
     const subMsg = socketService.onMessage(async (msg) => {
-        await storageService.saveMessage(msg);
+        let messageToSave = msg;
+
+        // If image and has base64 content, save to disk
+        if (msg.type === MessageType.IMAGE && msg.content.startsWith('data:')) {
+             try {
+                 if (window.electronAPI) {
+                     const filename = await window.electronAPI.invoke('file:save-image', msg.content);
+                     messageToSave = { ...msg, content: filename };
+                 }
+             } catch (e) {
+                 console.error('Failed to save incoming image', e);
+             }
+        }
+
+        await storageService.saveMessage(messageToSave);
 
         // FIX: If the message belongs to the active conversation, mark it as read immediately
         if (activeConversationId === msg.conversationId) {

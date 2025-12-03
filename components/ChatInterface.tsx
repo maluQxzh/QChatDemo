@@ -72,7 +72,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ conversationId, recipient
     }, 100);
   };
 
-  const handleSendMessage = async (type: MessageType = MessageType.TEXT, content: string = inputValue) => {
+  const handleSendMessage = async (type: MessageType = MessageType.TEXT, content: string = inputValue, attachmentData?: string) => {
     if (!content.trim()) return;
 
     const newMessage: Message = {
@@ -86,49 +86,66 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ conversationId, recipient
     };
 
     // Optimistic UI Update
-    setMessages(prev => [...prev, newMessage]);
+    const displayMessage = attachmentData ? { ...newMessage, content: attachmentData } : newMessage;
+    setMessages(prev => [...prev, displayMessage]);
     setInputValue('');
     scrollToBottom();
     setIsSending(true);
 
     try {
-      // 1. Save locally (Pending)
+      // 1. Save locally
       await storageService.saveMessage(newMessage);
 
       // 2. Send via Socket
-      await socketService.sendMessage(newMessage, recipient.id);
+      const socketMessage = attachmentData ? { ...newMessage, content: attachmentData } : newMessage;
+      await socketService.sendMessage(socketMessage, recipient.id);
 
       // 3. Update Status to Sent
       const sentMessage = { ...newMessage, status: MessageStatus.SENT };
-      setMessages(prev => prev.map(m => m.id === newMessage.id ? sentMessage : m));
+      setMessages(prev => prev.map(m => m.id === newMessage.id ? { ...displayMessage, status: MessageStatus.SENT } : m));
       await storageService.saveMessage(sentMessage);
 
       // 4. Simulate Delivery Receipt (after random delay)
       setTimeout(async () => {
           const deliveredMessage = { ...newMessage, status: MessageStatus.DELIVERED };
-           setMessages(prev => prev.map(m => m.id === newMessage.id ? deliveredMessage : m));
+           setMessages(prev => prev.map(m => m.id === newMessage.id ? { ...displayMessage, status: MessageStatus.DELIVERED } : m));
            await storageService.saveMessage(deliveredMessage);
       }, 2000);
 
     } catch (error) {
       logger.error('Chat', 'Send failed', error);
       const failedMessage = { ...newMessage, status: MessageStatus.FAILED };
-      setMessages(prev => prev.map(m => m.id === newMessage.id ? failedMessage : m));
+      setMessages(prev => prev.map(m => m.id === newMessage.id ? { ...displayMessage, status: MessageStatus.FAILED } : m));
       await storageService.saveMessage(failedMessage);
     } finally {
       setIsSending(false);
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
         const base64 = reader.result as string;
-        handleSendMessage(MessageType.IMAGE, base64);
+        
+        try {
+            let filename = base64;
+            if (window.electronAPI) {
+                const result = await window.electronAPI.invoke('file:save-image', base64);
+                if (result) filename = result;
+            }
+            handleSendMessage(MessageType.IMAGE, filename, base64);
+        } catch (error) {
+            logger.error('Chat', 'Failed to save image', error);
+            alert('图片发送失败');
+        }
       };
       reader.readAsDataURL(file);
+    }
+    // Reset input to allow selecting the same file again
+    if (fileInputRef.current) {
+        fileInputRef.current.value = '';
     }
   };
 

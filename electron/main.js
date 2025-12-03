@@ -2,6 +2,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const dns = require('dns');
+const fileService = require('./fileService');
 
 // Global reference to prevent garbage collection
 let mainWindow;
@@ -136,9 +137,22 @@ ipcMain.handle('db:set', (event, { key, value }) => {
 });
 
 // Clear Data
-ipcMain.handle('db:clear', () => {
-  if (userStore) userStore.clear();
-  // We generally don't clear global store on user reset, but let's clear userStore
+ipcMain.handle('db:clear', async () => {
+  if (userStore) {
+      // 1. Find all images belonging to this user
+      const messages = userStore.get('orbit_messages') || [];
+      const imageFiles = messages
+          .filter(m => m.type === 'IMAGE' && m.content && !m.content.startsWith('data:'))
+          .map(m => m.content);
+      
+      // 2. Delete those specific files
+      if (imageFiles.length > 0) {
+          await fileService.deleteFiles(imageFiles);
+      }
+
+      // 3. Clear the JSON store
+      userStore.clear();
+  }
   return true;
 });
 
@@ -160,4 +174,13 @@ ipcMain.handle('net:resolve-dns', async (event, hostname) => {
             }
         });
     });
+});
+
+// File System Handlers
+ipcMain.handle('file:save-image', async (event, base64Data) => {
+    return await fileService.saveImage(base64Data);
+});
+
+ipcMain.handle('file:read-image', async (event, filename) => {
+    return await fileService.readImage(filename);
 });

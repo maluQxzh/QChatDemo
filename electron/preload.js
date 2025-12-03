@@ -3,7 +3,12 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   // Storage Methods
   invoke: (channel, data) => {
-    let validChannels = ['db:get', 'db:set', 'db:clear', 'app:quit', 'auth:login', 'auth:logout', 'net:resolve-dns'];
+    let validChannels = [
+        'db:get', 'db:set', 'db:clear', 
+        'app:quit', 'auth:login', 'auth:logout', 
+        'net:resolve-dns',
+        'file:save-image', 'file:read-image'
+    ];
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, data);
     }

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Message, MessageType, MessageStatus } from '../types';
 import { Check, CheckCheck, Clock, AlertCircle } from 'lucide-react';
 
@@ -14,6 +14,26 @@ const formatTime = (ts: number) => {
 };
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, showAvatar }) => {
+  const [imageUrl, setImageUrl] = useState<string>(
+      message.type === MessageType.IMAGE && message.content.startsWith('data:') 
+      ? message.content 
+      : ''
+  );
+
+  useEffect(() => {
+      if (message.type === MessageType.IMAGE && !message.content.startsWith('data:')) {
+          // It's a filename, load it
+          if (window.electronAPI) {
+              window.electronAPI.invoke('file:read-image', message.content)
+                  .then(base64 => {
+                      if (base64) setImageUrl(base64);
+                  })
+                  .catch(err => console.error('Failed to load image', err));
+          }
+      } else if (message.type === MessageType.IMAGE) {
+          setImageUrl(message.content);
+      }
+  }, [message.content, message.type]);
   
   const getStatusIcon = () => {
     switch (message.status) {
@@ -49,12 +69,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, showAvatar
 
           {message.type === MessageType.IMAGE && (
             <div className="relative">
-                <img 
-                    src={message.content} 
-                    alt="Attachment" 
-                    className="rounded-lg max-h-64 object-cover border border-slate-200 dark:border-slate-700"
-                    loading="lazy"
-                />
+                {imageUrl ? (
+                    <img 
+                        src={imageUrl} 
+                        alt="Attachment" 
+                        className="rounded-lg max-h-64 object-cover border border-slate-200 dark:border-slate-700"
+                        loading="lazy"
+                    />
+                ) : (
+                    <div className="w-48 h-32 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center">
+                        <span className="text-xs text-slate-500">加载中...</span>
+                    </div>
+                )}
             </div>
           )}
         </div>
