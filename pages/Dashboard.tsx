@@ -228,6 +228,12 @@ const Dashboard: React.FC = () => {
       refreshData();
   };
 
+  const handleOpenConversation = async (convoId: string) => {
+      setActiveConversationId(convoId);
+      await storageService.markConversationRead(convoId);
+      await refreshData();
+  };
+
   const ConnectionBanner = () => {
       if (connectionState === 'CONNECTED') return null;
       return (
@@ -328,7 +334,7 @@ const Dashboard: React.FC = () => {
                 return (
                     <button
                         key={convo.id}
-                        onClick={() => setActiveConversationId(convo.id)}
+                        onClick={() => handleOpenConversation(convo.id)}
                         className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all text-left ${
                             isActive ? 'bg-white dark:bg-slate-800 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700' : 'hover:bg-slate-200/50 dark:hover:bg-slate-800/50'
                         }`}
