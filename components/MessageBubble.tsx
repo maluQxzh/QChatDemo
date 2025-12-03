@@ -40,7 +40,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, showAvatar
           } ${
             isMe
               ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-sm'
-              : 'bg-white text-slate-800 border border-slate-200 rounded-2xl rounded-tl-sm'
+              : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-tl-sm'
           }`}
         >
           {message.type === MessageType.TEXT && (
@@ -52,7 +52,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, showAvatar
                 <img 
                     src={message.content} 
                     alt="Attachment" 
-                    className="rounded-lg max-h-64 object-cover border border-slate-200"
+                    className="rounded-lg max-h-64 object-cover border border-slate-200 dark:border-slate-700"
                     loading="lazy"
                 />
             </div>
@@ -60,7 +60,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, showAvatar
         </div>
 
         <div className="flex items-center space-x-1 mt-1 px-1">
-          <span className="text-[10px] text-slate-400">
+          <span className="text-[10px] text-slate-400 dark:text-slate-500">
             {formatTime(message.timestamp)}
           </span>
           {isMe && getStatusIcon()}

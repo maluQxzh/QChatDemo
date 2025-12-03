@@ -23,7 +23,7 @@ const Avatar: React.FC<AvatarProps> = ({ src, name, status, size = 'md' }) => {
 
   return (
     <div className="relative inline-block">
-      <div className={`${sizeClasses[size]} rounded-full overflow-hidden flex items-center justify-center bg-indigo-100 text-indigo-700 font-bold border border-slate-200`}>
+      <div className={`${sizeClasses[size]} rounded-full overflow-hidden flex items-center justify-center bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-bold border border-slate-200 dark:border-slate-600`}>
         {src ? (
           <img src={src} alt={name} className="w-full h-full object-cover" />
         ) : (
@@ -32,7 +32,7 @@ const Avatar: React.FC<AvatarProps> = ({ src, name, status, size = 'md' }) => {
       </div>
       {status && (
         <span
-          className={`absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-white ${statusColors[status]}`}
+          className={`absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-slate-800 ${statusColors[status]}`}
         />
       )}
     </div>

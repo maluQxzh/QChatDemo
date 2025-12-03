@@ -112,19 +112,19 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-900 flex items-center justify-center p-4 transition-colors duration-200">
+      <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-2xl shadow-xl overflow-hidden transition-colors duration-200">
         <div className="p-8">
             <div className="flex justify-center mb-6">
-                <div className="bg-indigo-50 p-3 rounded-full">
-                    <ShieldCheck size={40} className="text-indigo-600" />
+                <div className="bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-full">
+                    <ShieldCheck size={40} className="text-indigo-600 dark:text-indigo-400" />
                 </div>
             </div>
-            <h2 className="text-2xl font-bold text-center text-slate-800 mb-2">欢迎回来</h2>
-            <p className="text-center text-slate-500 mb-8 text-sm">专为专业人士打造的安全通讯工具。</p>
+            <h2 className="text-2xl font-bold text-center text-slate-800 dark:text-white mb-2">欢迎回来</h2>
+            <p className="text-center text-slate-500 dark:text-slate-400 mb-8 text-sm">专为专业人士打造的安全通讯工具。</p>
             
             {error && (
-                <div className="mb-4 bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
+                <div className="mb-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
                     <AlertCircle size={16} />
                     {error}
                 </div>
@@ -132,32 +132,32 @@ const LoginPage: React.FC = () => {
             
             <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">用户 ID (唯一标识)</label>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">用户 ID (唯一标识)</label>
                     <input 
                         type="text" 
                         value={userId}
                         onChange={(e) => setUserId(e.target.value)}
                         placeholder="例如: user_001, alice"
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 outline-none transition-all text-slate-700 font-mono"
+                        className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all text-slate-700 font-mono"
                         required
                     />
-                    <p className="text-[10px] text-slate-400 mt-1">好友需要通过此 ID 添加你。</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">好友需要通过此 ID 添加你。</p>
                 </div>
                 <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">显示名称</label>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">显示名称</label>
                     <input 
                         type="text" 
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         placeholder="例如: 张三"
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 outline-none transition-all"
+                        className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all"
                         required
                     />
                 </div>
 
                 {/* Signaling Server Address (last section, IPv4 or Domain) */}
                 <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">信令服务器地址(留空则搜索本地或预设)</label>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">信令服务器地址(留空则搜索本地或预设)</label>
                     <div className="flex items-center gap-2">
                         <input 
                             type="text"
@@ -176,7 +176,7 @@ const LoginPage: React.FC = () => {
                                 }
                             }}
                             placeholder={serverHost.trim()==='' ? 'IP 或 域名' : ''}
-                            className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 outline-none transition-all font-mono"
+                            className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all font-mono"
                         />
                         <span className="text-slate-400">:</span>
                         <input 
@@ -187,7 +187,7 @@ const LoginPage: React.FC = () => {
                                 setServerPort(e.target.value.replace(/\D/g, ''));
                             }}
                             placeholder={serverPort.trim()==='' ? '端口号' : ''}
-                            className="w-28 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 outline-none transition-all font-mono"
+                            className="w-28 px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all font-mono"
                         />
                     </div>
                 </div>
@@ -201,7 +201,7 @@ const LoginPage: React.FC = () => {
                 </button>
             </form>
         </div>
-        <div className="bg-slate-50 px-8 py-4 border-t border-slate-100 text-center text-xs text-slate-400">
+        <div className="bg-slate-50 dark:bg-slate-900 px-8 py-4 border-t border-slate-100 dark:border-slate-700 text-center text-xs text-slate-400 dark:text-slate-500 transition-colors duration-200">
             当前版本: v0.1.0
         </div>
       </div>

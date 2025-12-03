@@ -193,22 +193,22 @@ const Dashboard: React.FC = () => {
   if (!currentUser) return null;
 
   return (
-    <div className="flex h-screen w-full bg-white overflow-hidden">
+    <div className="flex h-screen w-full bg-white dark:bg-slate-800 overflow-hidden transition-colors duration-200">
       
       {/* Sidebar - Contacts/Convos */}
-      <aside className="w-80 flex flex-col border-r border-slate-200 bg-slate-50">
+      <aside className="w-80 flex flex-col border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
         
         {/* User Profile Header */}
-        <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-            <h1 className="font-bold text-xl text-indigo-700 tracking-tight flex items-center gap-2">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <h1 className="font-bold text-xl text-indigo-700 dark:text-indigo-400 tracking-tight flex items-center gap-2">
                 <MessageSquare className="fill-current" size={24}/> QChat
             </h1>
             <div className="flex items-center gap-2">
                  <div className="text-xs text-right hidden sm:block">
-                    <div className="font-bold text-slate-700">{currentUser.username}</div>
-                    <div className="text-slate-400">ID: {currentUser.id}</div>
+                    <div className="font-bold text-slate-700 dark:text-slate-200">{currentUser.username}</div>
+                    <div className="text-slate-400 dark:text-slate-500">ID: {currentUser.id}</div>
                  </div>
-                 <button onClick={() => navigate('/settings')} className="text-slate-400 hover:text-slate-600 transition-colors">
+                 <button onClick={() => navigate('/settings')} className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors">
                     <Settings size={20} />
                 </button>
             </div>
@@ -221,7 +221,7 @@ const Dashboard: React.FC = () => {
                 <input 
                     type="text" 
                     placeholder="搜索会话..." 
-                    className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
+                    className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 dark:text-white transition-all"
                 />
             </div>
             <button 
@@ -239,22 +239,22 @@ const Dashboard: React.FC = () => {
                 <div className="text-[10px] font-bold text-slate-400 px-2 uppercase mb-1">新的好友申请</div>
                 <div className="space-y-1">
                     {friendRequests.map(req => (
-                        <div key={req.fromUser.id} className="bg-white border border-indigo-100 p-2 rounded-lg flex items-center gap-2 shadow-sm">
+                        <div key={req.fromUser.id} className="bg-white dark:bg-slate-800 border border-indigo-100 dark:border-indigo-900/50 p-2 rounded-lg flex items-center gap-2 shadow-sm">
                             <Avatar name={req.fromUser.username} src={req.fromUser.avatarUrl} size="sm" />
                             <div className="flex-1 min-w-0">
-                                <div className="text-xs font-bold truncate">{req.fromUser.username}</div>
+                                <div className="text-xs font-bold truncate dark:text-white">{req.fromUser.username}</div>
                                 <div className="text-[10px] text-slate-400 truncate">ID: {req.fromUser.id}</div>
                             </div>
                             <div className="flex gap-1">
                                 <button 
                                     onClick={() => handleAcceptRequest(req)}
-                                    className="p-1 bg-indigo-100 text-indigo-600 rounded hover:bg-indigo-200" title="同意"
+                                    className="p-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded hover:bg-indigo-200 dark:hover:bg-indigo-900" title="同意"
                                 >
                                     <Check size={14} />
                                 </button>
                                 <button 
                                     onClick={() => handleRejectRequest(req.fromUser.id)}
-                                    className="p-1 bg-slate-100 text-slate-400 rounded hover:bg-slate-200 hover:text-red-500" title="忽略"
+                                    className="p-1 bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded hover:bg-slate-200 dark:hover:bg-slate-600 hover:text-red-500" title="忽略"
                                 >
                                     <X size={14} />
                                 </button>
@@ -281,7 +281,7 @@ const Dashboard: React.FC = () => {
                         key={convo.id}
                         onClick={() => setActiveConversationId(convo.id)}
                         className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all text-left ${
-                            isActive ? 'bg-white shadow-sm ring-1 ring-slate-200' : 'hover:bg-slate-200/50'
+                            isActive ? 'bg-white dark:bg-slate-800 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700' : 'hover:bg-slate-200/50 dark:hover:bg-slate-800/50'
                         }`}
                     >
                         <div className="relative">
@@ -294,14 +294,14 @@ const Dashboard: React.FC = () => {
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className="flex justify-between items-baseline mb-0.5">
-                                <span className={`font-medium truncate ${isActive ? 'text-indigo-900' : 'text-slate-700'}`}>
+                                <span className={`font-medium truncate ${isActive ? 'text-indigo-900 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-200'}`}>
                                     {contact.username}
                                 </span>
-                                <span className="text-[10px] text-slate-400">
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500">
                                     {convo.updatedAt ? new Date(convo.updatedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
                                 </span>
                             </div>
-                            <p className={`text-xs truncate ${convo.unreadCount > 0 ? 'font-semibold text-slate-800' : 'text-slate-500'}`}>
+                            <p className={`text-xs truncate ${convo.unreadCount > 0 ? 'font-semibold text-slate-800 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400'}`}>
                                 {convo.lastMessage?.type === 'IMAGE' ? '[图片]' : convo.lastMessage?.content || '已添加好友，开始聊天吧'}
                             </p>
                         </div>
@@ -311,29 +311,29 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+        <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 flex items-center justify-between transition-colors duration-200">
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
                 {connectionState === 'CONNECTED' ? (
-                     <span className="flex items-center gap-1 text-green-600">
+                     <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
                         <Wifi size={14} /> 在线{(() => {
                           const url = socketService.getUrl?.() || '';
                           return (/^ws:\/\/(localhost|127\.0\.0\.1)/i).test(url) ? ' (本地)' : '';
                         })()}
                      </span>
                 ) : (
-                     <span className="flex items-center gap-1 text-red-500">
+                     <span className="flex items-center gap-1 text-red-500 dark:text-red-400">
                         <WifiOff size={14} /> 离线
                      </span>
                 )}
             </div>
-            <button onClick={handleLogout} className="text-slate-500 hover:text-red-600 transition-colors" title="退出登录">
+            <button onClick={handleLogout} className="text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 transition-colors" title="退出登录">
                 <LogOut size={18} />
             </button>
         </div>
       </aside>
 
       {/* Main Chat Area */}
-      <main className="flex-1 flex flex-col h-full bg-slate-50 relative shadow-inner">
+      <main className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-slate-800 relative shadow-inner transition-colors duration-200">
          <ConnectionBanner />
          {activeConversationId ? (
              <ChatInterface 
@@ -343,12 +343,12 @@ const Dashboard: React.FC = () => {
                 onDeleteFriend={handleDeleteFriend}
              />
          ) : (
-             <div className="flex-1 flex flex-col items-center justify-center text-slate-300">
-                 <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+             <div className="flex-1 flex flex-col items-center justify-center text-slate-300 dark:text-slate-600">
+                 <div className="w-24 h-24 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mb-4 transition-colors duration-200">
                     <MessageSquare size={48} className="opacity-50"/>
                  </div>
-                 <h3 className="text-lg font-medium text-slate-500">欢迎使用 QChat</h3>
-                 <p className="text-sm">选择一个联系人开始安全聊天。</p>
+                 <h3 className="text-lg font-medium text-slate-500 dark:text-slate-400">欢迎使用 QChat</h3>
+                 <p className="text-sm dark:text-slate-500">选择一个联系人开始安全聊天。</p>
              </div>
          )}
       </main>
@@ -356,33 +356,33 @@ const Dashboard: React.FC = () => {
       {/* Add Friend Modal */}
       {showAddFriend && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 relative animate-in fade-in zoom-in duration-200">
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-sm p-6 relative animate-in fade-in zoom-in duration-200 transition-colors duration-200">
                   <button 
                     onClick={() => setShowAddFriend(false)} 
-                    className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+                    className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                   >
                       <X size={20} />
                   </button>
                   <div className="flex items-center gap-3 mb-6">
-                      <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600">
+                      <div className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-lg text-indigo-600 dark:text-indigo-400">
                         <UserPlus size={24} />
                       </div>
-                      <h3 className="text-lg font-bold text-slate-800">添加好友</h3>
+                      <h3 className="text-lg font-bold text-slate-800 dark:text-white">添加好友</h3>
                   </div>
                   
                   <form onSubmit={handleSendRequest}>
                       <div className="space-y-4">
                         <div>
-                            <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">好友 ID</label>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">好友 ID</label>
                             <input 
                                 type="text" 
                                 value={newFriendId}
                                 onChange={e => setNewFriendId(e.target.value)}
                                 placeholder="输入对方 ID"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
                                 required
                             />
-                            <p className="text-[10px] text-slate-400 mt-1">对方将收到好友申请。</p>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">对方将收到好友申请。</p>
                         </div>
                         <button 
                             type="submit"

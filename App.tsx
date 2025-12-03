@@ -1,10 +1,22 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import SettingsPage from './pages/SettingsPage';
+import { storageService } from './services/storageService';
 
 const App: React.FC = () => {
+  useEffect(() => {
+    // Initialize theme
+    storageService.getSettings().then(settings => {
+      if (settings.theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    });
+  }, []);
+
   return (
     <HashRouter>
       <Routes>
