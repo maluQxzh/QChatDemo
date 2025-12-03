@@ -117,6 +117,9 @@ const Dashboard: React.FC = () => {
 
         await storageService.saveMessage(messageToSave);
 
+        // Send Delivery Receipt
+        socketService.sendDeliveryReceipt(msg.id, msg.senderId);
+
         // FIX: If the message belongs to the active conversation, mark it as read immediately
         if (activeConversationId === msg.conversationId) {
             await storageService.markConversationRead(msg.conversationId);

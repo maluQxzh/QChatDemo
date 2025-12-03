@@ -57,7 +57,7 @@ wss.on('connection', (ws) => {
       }
 
       // Handle P2P/Relay Message (Chat & Friend Signals)
-      const RELAY_TYPES = ['CHAT', 'FRIEND_REQUEST', 'FRIEND_ACCEPT', 'FRIEND_REMOVE'];
+      const RELAY_TYPES = ['CHAT', 'FRIEND_REQUEST', 'FRIEND_ACCEPT', 'FRIEND_REMOVE', 'MESSAGE_DELIVERED'];
       if (RELAY_TYPES.includes(message.type)) {
         const { targetUserId, payload } = message;
         const targetWs = clients.get(targetUserId);

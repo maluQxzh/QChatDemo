@@ -61,8 +61,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ conversationId, recipient
       }
     });
 
+    // Subscribe to delivery receipts
+    const unsubscribeReceipt = socketService.onDeliveryReceipt(async (messageId) => {
+        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, status: MessageStatus.DELIVERED } : m));
+        
+        // Update storage
+        const allMsgs = await storageService.getMessages(conversationId);
+        const msg = allMsgs.find(m => m.id === messageId);
+        if (msg) {
+            msg.status = MessageStatus.DELIVERED;
+            await storageService.saveMessage(msg);
+        }
+    });
+
     return () => {
       unsubscribe();
+      unsubscribeReceipt();
     };
   }, [conversationId]);
 
@@ -104,13 +118,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ conversationId, recipient
       const sentMessage = { ...newMessage, status: MessageStatus.SENT };
       setMessages(prev => prev.map(m => m.id === newMessage.id ? { ...displayMessage, status: MessageStatus.SENT } : m));
       await storageService.saveMessage(sentMessage);
-
-      // 4. Simulate Delivery Receipt (after random delay)
-      setTimeout(async () => {
-          const deliveredMessage = { ...newMessage, status: MessageStatus.DELIVERED };
-           setMessages(prev => prev.map(m => m.id === newMessage.id ? { ...displayMessage, status: MessageStatus.DELIVERED } : m));
-           await storageService.saveMessage(deliveredMessage);
-      }, 2000);
 
     } catch (error) {
       logger.error('Chat', 'Send failed', error);

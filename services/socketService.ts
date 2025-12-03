@@ -11,6 +11,7 @@ type FriendSignalHandler = (payload: any) => void;
 type StatusUpdateHandler = (userId: string, status: string) => void;
 type ForceLogoutHandler = () => void;
 type OnlineUsersListHandler = (userIds: string[]) => void;
+type DeliveryReceiptHandler = (messageId: string) => void;
 
 class SocketService {
   private state: ConnectionState = 'DISCONNECTED';
@@ -23,6 +24,7 @@ class SocketService {
   private statusUpdateHandlers: Set<StatusUpdateHandler> = new Set();
   private forceLogoutHandlers: Set<ForceLogoutHandler> = new Set();
   private onlineUsersListHandlers: Set<OnlineUsersListHandler> = new Set();
+  private deliveryReceiptHandlers: Set<DeliveryReceiptHandler> = new Set();
   
   // Cache for online users to handle race conditions
   private cachedOnlineUsers: Set<string> = new Set();
@@ -210,6 +212,9 @@ class SocketService {
                       this.cachedOnlineUsers = new Set(data.userIds);
                       this.onlineUsersListHandlers.forEach(h => h(data.userIds));
                   }
+                  if (data.type === 'MESSAGE_DELIVERED') {
+                      this.deliveryReceiptHandlers.forEach(h => h(data.payload.messageId));
+                  }
               } catch (err) {
                   logger.error('Network', 'Failed to parse message', err);
               }
@@ -267,6 +272,16 @@ class SocketService {
       } else {
           logger.error('Network', 'Cannot send message: Socket not open');
           throw new Error('Network disconnected');
+      }
+  }
+
+  async sendDeliveryReceipt(messageId: string, recipientId: string) {
+      if (this.socket?.readyState === WebSocket.OPEN) {
+          this.socket.send(JSON.stringify({
+              type: 'MESSAGE_DELIVERED',
+              targetUserId: recipientId,
+              payload: { messageId }
+          }));
       }
   }
 
@@ -349,6 +364,11 @@ class SocketService {
   onForceLogout(handler: ForceLogoutHandler) {
       this.forceLogoutHandlers.add(handler);
       return () => this.forceLogoutHandlers.delete(handler);
+  }
+
+  onDeliveryReceipt(handler: DeliveryReceiptHandler) {
+      this.deliveryReceiptHandlers.add(handler);
+      return () => this.deliveryReceiptHandlers.delete(handler);
   }
 
   private updateState(newState: ConnectionState) {
