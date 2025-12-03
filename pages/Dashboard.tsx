@@ -12,6 +12,7 @@ const Dashboard: React.FC = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [contacts, setContacts] = useState<User[]>([]);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [connectionState, setConnectionState] = useState(socketService.getState());
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
@@ -22,8 +23,8 @@ const Dashboard: React.FC = () => {
   
   const navigate = useNavigate();
 
+  // Effect 1: Initialization, Connection, and Global Listeners (Run once)
   useEffect(() => {
-    // Initialization
     const init = async () => {
       // Prevent fetching user from storage if we already have one (e.g. passed from login or kept in memory)
       if (socketService.getState() === 'CONNECTED' && currentUser) {
@@ -48,24 +49,11 @@ const Dashboard: React.FC = () => {
     };
     init();
 
-    // Listeners
+    // Listeners that don't depend on UI state
     const subSocket = socketService.onConnectionChange((state) => {
         setConnectionState(state);
     });
-    
-    // Refresh list on message AND PERSIST IT
-    const subMsg = socketService.onMessage(async (msg) => {
-        await storageService.saveMessage(msg);
 
-        // FIX: If the message belongs to the active conversation, mark it as read immediately
-        if (activeConversationId === msg.conversationId) {
-            await storageService.markConversationRead(msg.conversationId);
-        }
-        
-        refreshData();
-    });
-
-    // Handle Friend Signals
     const subReq = socketService.onFriendRequest(async (req) => {
         const request = req as { fromUser: User, timestamp: number };
         await storageService.addFriendRequest(request);
@@ -76,6 +64,50 @@ const Dashboard: React.FC = () => {
         const { user } = data as { user: User };
         await storageService.addContact(user);
         await storageService.createConversation(user.id);
+        refreshData();
+    });
+
+    const subForceLogout = socketService.onForceLogout(() => {
+        alert('您的账号已在别处登录，当前连接已断开。');
+        handleLogout();
+    });
+
+    const subStatus = socketService.onStatusUpdate((userId, status) => {
+        setOnlineUserIds(prev => {
+            const next = new Set(prev);
+            if (status === 'online') {
+                next.add(userId);
+            } else {
+                next.delete(userId);
+            }
+            return next;
+        });
+    });
+
+    const subOnlineList = socketService.onOnlineUsersList((userIds) => {
+        setOnlineUserIds(new Set(userIds));
+    });
+
+    return () => {
+        subSocket();
+        subReq();
+        subAccept();
+        subForceLogout();
+        subStatus();
+        subOnlineList();
+    };
+  }, []); // Empty dependency array: runs only on mount
+
+  // Effect 2: Listeners that depend on UI state (activeConversationId, conversations)
+  useEffect(() => {
+    const subMsg = socketService.onMessage(async (msg) => {
+        await storageService.saveMessage(msg);
+
+        // FIX: If the message belongs to the active conversation, mark it as read immediately
+        if (activeConversationId === msg.conversationId) {
+            await storageService.markConversationRead(msg.conversationId);
+        }
+        
         refreshData();
     });
 
@@ -92,19 +124,9 @@ const Dashboard: React.FC = () => {
         refreshData();
     });
 
-    // Handle Force Logout
-    const subForceLogout = socketService.onForceLogout(() => {
-        alert('您的账号已在别处登录，当前连接已断开。');
-        handleLogout();
-    });
-
     return () => {
-        subSocket();
         subMsg();
-        subReq();
-        subAccept();
         subRemove();
-        subForceLogout();
     };
   }, [activeConversationId, conversations]);
 
@@ -112,16 +134,26 @@ const Dashboard: React.FC = () => {
       const storedConvos = await storageService.getConversations();
       const storedContacts = await storageService.getContacts();
       const storedRequests = await storageService.getFriendRequests();
+      
       setConversations(storedConvos);
       setContacts(storedContacts);
       setFriendRequests(storedRequests);
   };
 
-  const getContact = (id: string) => contacts.find(c => c.id === id) || { 
-      id: id, 
-      username: '未知用户', 
-      status: 'offline' 
-  } as User;
+  const getContact = (id: string): User => {
+      const contact = contacts.find(c => c.id === id);
+      if (!contact) {
+          return { 
+            id: id, 
+            username: '未知用户', 
+            status: (onlineUserIds.has(id) ? 'online' : 'offline') as 'online' | 'offline'
+          } as User;
+      }
+      return {
+          ...contact,
+          status: (onlineUserIds.has(id) ? 'online' : 'offline') as 'online' | 'offline'
+      };
+  };
 
   const handleLogout = () => {
       socketService.disconnect();

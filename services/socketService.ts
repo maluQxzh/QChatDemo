@@ -8,7 +8,9 @@ type ConnectionState = 'CONNECTING' | 'CONNECTED' | 'DISCONNECTED' | 'RECONNECTI
 type MessageHandler = (message: Message) => void;
 type ConnectionHandler = (state: ConnectionState) => void;
 type FriendSignalHandler = (payload: any) => void;
+type StatusUpdateHandler = (userId: string, status: string) => void;
 type ForceLogoutHandler = () => void;
+type OnlineUsersListHandler = (userIds: string[]) => void;
 
 class SocketService {
   private state: ConnectionState = 'DISCONNECTED';
@@ -18,7 +20,12 @@ class SocketService {
   private friendRequestHandlers: Set<FriendSignalHandler> = new Set();
   private friendAcceptHandlers: Set<FriendSignalHandler> = new Set();
   private friendRemoveHandlers: Set<FriendSignalHandler> = new Set();
+  private statusUpdateHandlers: Set<StatusUpdateHandler> = new Set();
   private forceLogoutHandlers: Set<ForceLogoutHandler> = new Set();
+  private onlineUsersListHandlers: Set<OnlineUsersListHandler> = new Set();
+  
+  // Cache for online users to handle race conditions
+  private cachedOnlineUsers: Set<string> = new Set();
 
   private heartbeatTimer: any = null;
   private socket: WebSocket | null = null;
@@ -191,6 +198,18 @@ class SocketService {
                   if (data.type === 'FRIEND_REMOVE') {
                       this.friendRemoveHandlers.forEach(h => h(data.payload));
                   }
+                  if (data.type === 'STATUS_UPDATE') {
+                      if (data.status === 'online') {
+                          this.cachedOnlineUsers.add(data.userId);
+                      } else {
+                          this.cachedOnlineUsers.delete(data.userId);
+                      }
+                      this.statusUpdateHandlers.forEach(h => h(data.userId, data.status));
+                  }
+                  if (data.type === 'ONLINE_USERS_LIST') {
+                      this.cachedOnlineUsers = new Set(data.userIds);
+                      this.onlineUsersListHandlers.forEach(h => h(data.userIds));
+                  }
               } catch (err) {
                   logger.error('Network', 'Failed to parse message', err);
               }
@@ -235,6 +254,7 @@ class SocketService {
     }
     this.updateState('DISCONNECTED');
     this.currentUser = null;
+    this.cachedOnlineUsers.clear();
   }
 
   async sendMessage(message: Message, recipientId: string) {
@@ -310,6 +330,20 @@ class SocketService {
   onFriendRemove(handler: FriendSignalHandler) {
       this.friendRemoveHandlers.add(handler);
       return () => this.friendRemoveHandlers.delete(handler);
+  }
+
+  onStatusUpdate(handler: StatusUpdateHandler) {
+      this.statusUpdateHandlers.add(handler);
+      return () => this.statusUpdateHandlers.delete(handler);
+  }
+  
+  onOnlineUsersList(handler: OnlineUsersListHandler) {
+      this.onlineUsersListHandlers.add(handler);
+      // Immediately call with cached data if available
+      if (this.cachedOnlineUsers.size > 0) {
+          handler(Array.from(this.cachedOnlineUsers));
+      }
+      return () => this.onlineUsersListHandlers.delete(handler);
   }
   
   onForceLogout(handler: ForceLogoutHandler) {

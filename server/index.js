@@ -44,6 +44,13 @@ wss.on('connection', (ws) => {
         clients.set(currentUserId, ws);
         console.log(`User connected: ${currentUserId}`);
         
+        // Send list of currently online users to the new user
+        const onlineUsers = Array.from(clients.keys()).filter(id => id !== currentUserId);
+        ws.send(JSON.stringify({
+            type: 'ONLINE_USERS_LIST',
+            userIds: onlineUsers
+        }));
+
         // Broadcast presence
         broadcastStatus(currentUserId, 'online');
         return;
