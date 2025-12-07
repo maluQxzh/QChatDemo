@@ -261,6 +261,17 @@ ipcMain.handle('db:convo-delete-by-participant', (event, participantId) => {
   return true;
 });
 
+// Friend requests fine-grained operations
+ipcMain.handle('db:friend-request-upsert', (event, request) => {
+  dbService.upsertFriendRequest(request);
+  return true;
+});
+
+ipcMain.handle('db:friend-request-remove-by-userId', (event, userId) => {
+  dbService.removeFriendRequestByUserId(userId);
+  return true;
+});
+
 // Quit App
 ipcMain.handle('app:quit', () => {
     app.quit();

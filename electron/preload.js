@@ -10,7 +10,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         'file:save-image', 'file:read-image',
         'db:messages-by-conversation', 'db:message-upsert',
         'db:conversation-update-last', 'db:conversation-create',
-        'db:conversation-mark-read', 'db:convo-delete-by-participant'
+        'db:conversation-mark-read', 'db:convo-delete-by-participant',
+        'db:friend-request-upsert', 'db:friend-request-remove-by-userId'
     ];
     if (validChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, data);

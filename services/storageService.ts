@@ -150,8 +150,12 @@ class StorageService {
   }
 
   async addFriendRequest(request: FriendRequest): Promise<void> {
+    if (this.isElectron) {
+      await window.electronAPI!.invoke('db:friend-request-upsert', request);
+      return;
+    }
+
     const requests = await this.getFriendRequests();
-    // Avoid duplicates
     if (!requests.find(r => r.fromUser.id === request.fromUser.id)) {
       requests.push(request);
       await this.setItem(KEY_FRIEND_REQUESTS, requests);
@@ -159,6 +163,11 @@ class StorageService {
   }
 
   async removeFriendRequest(userId: string): Promise<void> {
+    if (this.isElectron) {
+      await window.electronAPI!.invoke('db:friend-request-remove-by-userId', userId);
+      return;
+    }
+
     let requests = await this.getFriendRequests();
     requests = requests.filter(r => r.fromUser.id !== userId);
     await this.setItem(KEY_FRIEND_REQUESTS, requests);
