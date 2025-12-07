@@ -12,6 +12,7 @@ type StatusUpdateHandler = (userId: string, status: string) => void;
 type ForceLogoutHandler = () => void;
 type OnlineUsersListHandler = (userIds: string[]) => void;
 type DeliveryReceiptHandler = (messageId: string) => void;
+type UserUpdateHandler = (data: { userId: string; username: string }) => void;
 
 class SocketService {
   private state: ConnectionState = 'DISCONNECTED';
@@ -25,6 +26,7 @@ class SocketService {
   private forceLogoutHandlers: Set<ForceLogoutHandler> = new Set();
   private onlineUsersListHandlers: Set<OnlineUsersListHandler> = new Set();
   private deliveryReceiptHandlers: Set<DeliveryReceiptHandler> = new Set();
+    private userUpdateHandlers: Set<UserUpdateHandler> = new Set();
   
   // Cache for online users to handle race conditions
   private cachedOnlineUsers: Set<string> = new Set();
@@ -216,6 +218,14 @@ class SocketService {
                   }
                   if (data.type === 'MESSAGE_DELIVERED') {
                       this.deliveryReceiptHandlers.forEach(h => h(data.payload.messageId));
+                      }
+                      if (data.type === 'USER_UPDATE_BROADCAST') {
+                          const { from, payload } = data;
+                          if (from && payload && payload.username) {
+                              this.userUpdateHandlers.forEach(h =>
+                                  h({ userId: from, username: payload.username })
+                              );
+                          }
                   }
               } catch (err) {
                   logger.error('Network', 'Failed to parse message', err);
@@ -321,6 +331,18 @@ class SocketService {
       }
   }
 
+  // --- User Profile Methods ---
+
+  async sendUserUpdate(user: User) {
+      if (this.socket?.readyState === WebSocket.OPEN) {
+          this.socket.send(JSON.stringify({
+              type: 'USER_UPDATE',
+              from: user.id,
+              payload: { username: user.username }
+          }));
+      }
+  }
+
   // --- Listeners ---
 
   onMessage(handler: MessageHandler) {
@@ -377,6 +399,11 @@ class SocketService {
   onDeliveryReceipt(handler: DeliveryReceiptHandler) {
       this.deliveryReceiptHandlers.add(handler);
       return () => this.deliveryReceiptHandlers.delete(handler);
+  }
+
+  onUserUpdate(handler: UserUpdateHandler) {
+      this.userUpdateHandlers.add(handler);
+      return () => this.userUpdateHandlers.delete(handler);
   }
 
   private updateState(newState: ConnectionState) {

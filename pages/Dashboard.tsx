@@ -5,7 +5,7 @@ import { storageService } from '../services/storageService';
 import { socketService } from '../services/socketService';
 import ChatInterface from '../components/ChatInterface';
 import Avatar from '../components/Avatar';
-import { Search, Settings, MessageSquare, LogOut, Wifi, WifiOff, Plus, UserPlus, X, Check } from 'lucide-react';
+import { Search, Settings, MessageSquare, LogOut, Wifi, WifiOff, Plus, UserPlus, X, Check, Edit2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Dashboard: React.FC = () => {
@@ -17,6 +17,8 @@ const Dashboard: React.FC = () => {
   const [connectionState, setConnectionState] = useState(socketService.getState());
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [showAddFriend, setShowAddFriend] = useState(false);
+    const [editingName, setEditingName] = useState(false);
+    const [tempName, setTempName] = useState('');
   
   // Add Friend Inputs
   const [newFriendId, setNewFriendId] = useState('');
@@ -141,9 +143,17 @@ const Dashboard: React.FC = () => {
         refreshData();
     });
 
+    const subUserUpdate = socketService.onUserUpdate(async ({ userId, username }) => {
+        // Update local contacts in persistent storage
+        await storageService.updateContactUsername(userId, username);
+        // Sync in-memory contacts state to refresh UI immediately
+        setContacts(prev => prev.map(c => c.id === userId ? { ...c, username } : c));
+    });
+
     return () => {
         subMsg();
         subRemove();
+        subUserUpdate();
     };
   }, [activeConversationId, conversations]);
 
@@ -155,6 +165,9 @@ const Dashboard: React.FC = () => {
       setConversations(storedConvos);
       setContacts(storedContacts);
       setFriendRequests(storedRequests);
+            if (currentUser && !editingName) {
+                setTempName(currentUser.username || currentUser.id);
+            }
   };
 
   const getContact = (id: string): User => {
@@ -176,6 +189,17 @@ const Dashboard: React.FC = () => {
       socketService.disconnect();
       storageService.logout(); 
       navigate('/');
+  };
+
+  const handleSaveDisplayName = async () => {
+      if (!currentUser) return;
+      const newName = tempName.trim() || currentUser.id;
+      const updatedUser = { ...currentUser, username: newName };
+      await storageService.setCurrentUser(updatedUser);
+      setCurrentUser(updatedUser);
+      // Notify server to broadcast nickname change to friends
+      await socketService.sendUserUpdate(updatedUser);
+      setEditingName(false);
   };
 
   const handleSendRequest = async (e: React.FormEvent) => {
@@ -259,10 +283,49 @@ const Dashboard: React.FC = () => {
                 <MessageSquare className="fill-current" size={24}/> QChat
             </h1>
             <div className="flex items-center gap-2 no-drag">
-                 <div className="text-xs text-right hidden sm:block">
-                    <div className="font-bold text-slate-700 dark:text-slate-200">{currentUser.username}</div>
-                    <div className="text-slate-400 dark:text-slate-500">ID: {currentUser.id}</div>
-                 </div>
+                                 <div className="text-xs text-right hidden sm:block">
+                                        {editingName ? (
+                                            <div className="flex flex-col items-end gap-1">
+                                                <input
+                                                    type="text"
+                                                    value={tempName}
+                                                    onChange={(e) => setTempName(e.target.value)}
+                                                    className="px-2 py-1 rounded bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-[11px] text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                                                    autoFocus
+                                                />
+                                                <div className="flex gap-1">
+                                                    <button
+                                                        onClick={handleSaveDisplayName}
+                                                        className="px-2 py-0.5 rounded bg-indigo-600 text-white text-[10px] hover:bg-indigo-700"
+                                                    >
+                                                        保存
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { setEditingName(false); setTempName(currentUser.username || currentUser.id); }}
+                                                        className="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-600 text-[10px] text-slate-600 dark:text-slate-200"
+                                                    >
+                                                        取消
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="flex items-center gap-1 justify-end">
+                                                    <div className="font-bold text-slate-700 dark:text-slate-200 max-w-[120px] truncate" title={currentUser.username || currentUser.id}>
+                                                        {currentUser.username || currentUser.id}
+                                                    </div>
+                                                    <button
+                                                        onClick={() => { setEditingName(true); setTempName(currentUser.username || currentUser.id); }}
+                                                        className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                                                        title="编辑昵称"
+                                                    >
+                                                        <Edit2 size={14} />
+                                                    </button>
+                                                </div>
+                                                <div className="text-slate-400 dark:text-slate-500">ID: {currentUser.id}</div>
+                                            </>
+                                        )}
+                                 </div>
                  <button onClick={() => navigate('/settings')} className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors">
                     <Settings size={20} />
                 </button>
@@ -350,7 +413,7 @@ const Dashboard: React.FC = () => {
                         <div className="flex-1 min-w-0">
                             <div className="flex justify-between items-baseline mb-0.5">
                                 <span className={`font-medium truncate ${isActive ? 'text-indigo-900 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-200'}`}>
-                                    {contact.username}
+                                    {`${contact.username || contact.id} (${contact.id})`}
                                 </span>
                                 <span className="text-[10px] text-slate-400 dark:text-slate-500">
                                     {convo.updatedAt ? new Date(convo.updatedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}

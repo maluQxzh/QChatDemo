@@ -8,7 +8,6 @@ import { ShieldCheck, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [username, setUsername] = useState('');
   const [userId, setUserId] = useState('');
   const [serverHost, setServerHost] = useState('');
   const [serverPort, setServerPort] = useState('');
@@ -20,11 +19,9 @@ const LoginPage: React.FC = () => {
           const lastUser = await storageService.getLastUser();
           if (lastUser) {
               setUserId(lastUser.id);
-              setUsername(lastUser.username);
           } else {
               // Default if no history
               setUserId(`user_${Math.floor(Math.random() * 1000)}`);
-              setUsername('我');
           }
           // Prefill server config from settings if any
           const settings = await storageService.getSettings();
@@ -36,7 +33,7 @@ const LoginPage: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if(!userId.trim() || !username.trim()) return;
+        if(!userId.trim()) return;
 
     setLoading(true);
     setError(null);
@@ -60,12 +57,17 @@ const LoginPage: React.FC = () => {
         }
     }
     
-    // Create User Object
+    // Create / restore User Object
+    const baseId = userId.trim();
+
+    // Prefer per-user profile (supports multiple accounts each remembering their own nickname)
+    const existingProfile = await storageService.getUserProfile(baseId);
+
     const user = {
-        id: userId.trim(),
-        username: username.trim(),
+        id: baseId,
+        username: existingProfile?.username || baseId,
         status: 'online' as const,
-        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`
+        avatarUrl: existingProfile?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${baseId}`
     };
 
     // Save Session
@@ -142,17 +144,6 @@ const LoginPage: React.FC = () => {
                         required
                     />
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">好友需要通过此 ID 添加你。</p>
-                </div>
-                <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">显示名称</label>
-                    <input 
-                        type="text" 
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        placeholder="例如: 张三"
-                        className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all"
-                        required
-                    />
                 </div>
 
                 {/* Signaling Server Address (last section, IPv4 or Domain) */}

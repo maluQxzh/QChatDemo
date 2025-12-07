@@ -8,6 +8,7 @@ const KEY_CONVERSATIONS = 'orbit_conversations';
 const KEY_SETTINGS = 'orbit_settings';
 const KEY_CONTACTS = 'orbit_contacts';
 const KEY_CURRENT_USER = 'orbit_current_user';
+const KEY_USERS = 'orbit_users';
 const KEY_FRIEND_REQUESTS = 'orbit_friend_requests';
 
 class StorageService {
@@ -114,11 +115,36 @@ class StorageService {
       }
   }
 
+  // Persist per-user profile (e.g. nickname) keyed by id so that
+  // multiple accounts can each remember their own username.
+  private async getAllUserProfiles(): Promise<Record<string, User>> {
+    const users = await this.getItem<Record<string, User>>(KEY_USERS);
+    return users || {};
+  }
+
+  private async setAllUserProfiles(users: Record<string, User>): Promise<void> {
+    await this.setItem(KEY_USERS, users);
+  }
+
+  async getUserProfile(userId: string): Promise<User | null> {
+    const users = await this.getAllUserProfiles();
+    return users[userId] || null;
+  }
+
+  async setUserProfile(user: User): Promise<void> {
+    const users = await this.getAllUserProfiles();
+    users[user.id] = user;
+    await this.setAllUserProfiles(users);
+  }
+
   async setCurrentUser(user: User): Promise<void> {
     this.cachedUser = user;
     
     // 1. Save global "Last User" ref (persists for next login)
     await this.setItem(KEY_CURRENT_USER, user);
+    // 1.b Also persist per-user profile so multiple accounts
+    // each remember their own nickname and avatar.
+    await this.setUserProfile(user);
     
     // 2. Switch Context
     this.currentUserId = user.id;
@@ -130,7 +156,11 @@ class StorageService {
     // 3. Re-seed contacts if empty
     const contacts = await this.getContacts();
     if (!contacts || contacts.length === 0) {
-        await this.setItem(KEY_CONTACTS, INITIAL_CONTACTS);
+      await this.setItem(KEY_CONTACTS, INITIAL_CONTACTS);
+    } else {
+      // Ensure the current user entry in contacts reflects the latest nickname
+      const updatedContacts = contacts.map(c => c.id === user.id ? { ...c, username: user.username } : c);
+      await this.setItem(KEY_CONTACTS, updatedContacts);
     }
   }
 
@@ -191,6 +221,14 @@ class StorageService {
     let contacts = await this.getContacts();
     contacts = contacts.filter(c => c.id !== contactId);
     await this.setItem(KEY_CONTACTS, contacts);
+  }
+
+  // Update a contact's nickname by id
+  async updateContactUsername(userId: string, username: string): Promise<void> {
+    const contacts = await this.getContacts();
+    if (!contacts || contacts.length === 0) return;
+    const updated = contacts.map(c => c.id === userId ? { ...c, username } : c);
+    await this.setItem(KEY_CONTACTS, updated);
   }
 
   // --- Conversations ---

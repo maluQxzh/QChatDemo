@@ -10,7 +10,7 @@ const wss = new WebSocketServer({ port: PORT, host: HOST });
 
 console.log(`Signaling Server started on ws://${HOST}:${PORT}`);
 
-// Store clients: userId -> WebSocket
+// Store clients: userId -> { ws, username? }
 const clients = new Map();
 
 // --- Offline message persistence ---
@@ -99,9 +99,9 @@ wss.on('connection', (ws) => {
             oldWs.close();
           }
         }
-
-        clients.set(currentUserId, ws);
-        console.log(`User connected: ${currentUserId}`);
+        // Store connection with optional username
+        clients.set(currentUserId, { ws, username: message.username });
+        console.log(`User connected: ${currentUserId} (username: ${message.username || 'N/A'})`);
         
         // Send list of currently online users to the new user
         const onlineUsers = Array.from(clients.keys()).filter(id => id !== currentUserId);
@@ -122,7 +122,8 @@ wss.on('connection', (ws) => {
       const RELAY_TYPES = ['CHAT', 'FRIEND_REQUEST', 'FRIEND_ACCEPT', 'FRIEND_REMOVE', 'MESSAGE_DELIVERED'];
       if (RELAY_TYPES.includes(message.type)) {
         const { targetUserId, payload } = message;
-        const targetWs = clients.get(targetUserId);
+        const target = clients.get(targetUserId);
+        const targetWs = target && target.ws;
         
         if (targetWs && targetWs.readyState === 1) { // 1 = OPEN
           targetWs.send(JSON.stringify({
@@ -138,6 +139,35 @@ wss.on('connection', (ws) => {
             queueOfflineMessage(targetUserId, message.type, payload);
           }
         }
+        return;
+      }
+
+      // Handle user profile updates (e.g., nickname)
+      if (message.type === 'USER_UPDATE') {
+        const userId = message.from;
+        const { username } = message.payload || {};
+        if (!userId || !username) return;
+
+        const clientInfo = clients.get(userId);
+        if (!clientInfo) return;
+
+        // Update server-side cached username
+        clientInfo.username = username;
+        clients.set(userId, clientInfo);
+
+        const broadcastMsg = JSON.stringify({
+          type: 'USER_UPDATE_BROADCAST',
+          from: userId,
+          payload: { username },
+        });
+
+        // For now, broadcast to all connected clients
+        for (const { ws: clientWs } of clients.values()) {
+          if (clientWs && clientWs.readyState === 1) {
+            clientWs.send(broadcastMsg);
+          }
+        }
+        return;
       }
 
     } catch (e) {
@@ -146,7 +176,9 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
-    if (currentUserId && clients.get(currentUserId) === ws) {
+    if (!currentUserId) return;
+    const clientInfo = clients.get(currentUserId);
+    if (clientInfo && clientInfo.ws === ws) {
       clients.delete(currentUserId);
       console.log(`User disconnected: ${currentUserId}`);
       broadcastStatus(currentUserId, 'offline');
@@ -161,9 +193,9 @@ function broadcastStatus(userId, status) {
     status
   });
   
-  for (const client of clients.values()) {
-    if (client.readyState === 1) {
-      client.send(statusMsg);
+  for (const { ws } of clients.values()) {
+    if (ws.readyState === 1) {
+      ws.send(statusMsg);
     }
   }
 }

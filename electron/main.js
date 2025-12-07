@@ -95,6 +95,11 @@ ipcMain.handle('db:get', (event, key) => {
     return dbService.getGlobal(key);
   }
 
+  if (key === 'orbit_users') {
+    // Per-user profile map (id -> User), stored in global KV
+    return dbService.getGlobal(key) || {};
+  }
+
   // Per-user structured data
   if (key === 'orbit_settings') {
     return dbService.getSettings();
@@ -136,6 +141,10 @@ ipcMain.handle('db:get', (event, key) => {
 ipcMain.handle('db:set', (event, { key, value }) => {
   if (key === 'orbit_current_user') {
     dbService.setGlobal(key, value);
+    return true;
+  }
+  if (key === 'orbit_users') {
+    dbService.setGlobal(key, value || {});
     return true;
   }
   if (key === 'orbit_settings') {
