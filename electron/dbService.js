@@ -100,6 +100,12 @@ class DbService {
     this.userDb.exec('DELETE FROM settings;');
   }
 
+  // Clear only chat-related tables for the current user (messages + conversations)
+  clearUserChatsOnly() {
+    if (!this.userDb) return;
+    this.userDb.exec('DELETE FROM messages;');
+  }
+
   // ---- User relational schema & high-level operations ----
 
   initUserSchema(db) {

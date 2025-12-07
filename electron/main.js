@@ -173,7 +173,7 @@ ipcMain.handle('db:set', (event, { key, value }) => {
 // Clear Data
 ipcMain.handle('db:clear', async () => {
   // 1. Find all images belonging to this user from messages in SQLite
-  const allMessages = dbService.getMessagesByConversation ? dbService.getAllMessages?.() : [];
+  const allMessages = dbService.getAllMessages();
   const imageFiles = Array.isArray(allMessages)
     ? allMessages
       .filter(m => m && m.type === 'IMAGE' && m.content && typeof m.content === 'string' && !m.content.startsWith('data:'))
@@ -184,8 +184,8 @@ ipcMain.handle('db:clear', async () => {
     await fileService.deleteFiles(imageFiles);
   }
 
-  // 2. Clear KV store for this user
-  dbService.clearUser();
+  // 2. Clear only chat-related tables (messages & conversations)
+  dbService.clearUserChatsOnly?.();
 
   return true;
 });

@@ -351,7 +351,8 @@ class StorageService {
     if(this.isElectron) {
       await window.electronAPI?.invoke('db:clear');
     } else {
-      localStorage.clear();
+      const finalMessagesKey = this.getStorageKey(KEY_MESSAGES);
+      localStorage.removeItem(finalMessagesKey);
     }
   }
 }

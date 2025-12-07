@@ -29,7 +29,7 @@ const SettingsPage: React.FC = () => {
   };
 
   const clearData = async () => {
-      if(confirm('确定吗？这将删除所有本地消息。')) {
+      if(confirm('确定吗？这将删除本账号的本地聊天记录（消息与会话），但会保留账号信息和好友列表。')) {
           await storageService.clearAll();
           window.location.reload();
       }
@@ -95,7 +95,7 @@ const SettingsPage: React.FC = () => {
                    
                    <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
                         <button onClick={clearData} className="flex items-center gap-2 text-red-600 text-sm hover:underline">
-                            <Trash2 size={16} /> 清除本地数据 (重置应用)
+                            <Trash2 size={16} /> 清除本地聊天数据
                         </button>
                    </div>
                </div>
