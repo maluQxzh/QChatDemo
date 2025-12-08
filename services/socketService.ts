@@ -86,7 +86,7 @@ class SocketService {
           // 1. Localhost
           this.endpointList.push('ws://localhost:8080');
           // 2. Hardcoded Fallback
-          this.endpointList.push('ws://103.40.14.123:58080');
+          this.endpointList.push('ws://111.170.33.13:48080');
       }
       
       logger.info('Network', `Configured endpoints: ${JSON.stringify(this.endpointList)}`);
