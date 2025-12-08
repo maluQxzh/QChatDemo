@@ -4,6 +4,14 @@
 
 前置：已安装 Node.js
 
+安装构建工具包(linux)
+```
+install build-essential
+```
+
+安装构建工具包(windows)
+Visual Studio Build Tools
+
 1) 安装依赖
 
 ```
