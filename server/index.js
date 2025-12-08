@@ -2,6 +2,7 @@
 const { WebSocketServer } = require('ws');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const PORT = Number(process.env.PORT) || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -17,6 +18,10 @@ const clients = new Map();
 // Simple JSON file based store: { [userId]: Message[] }
 const DATA_DIR = path.join(__dirname, 'data');
 const OFFLINE_FILE = path.join(DATA_DIR, 'offlineMessages.json');
+
+// --- Account storage (very lightweight) ---
+// { [userId]: { passwordHash: string } }
+const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
 
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
@@ -42,8 +47,32 @@ function saveOfflineStore(store) {
   }
 }
 
+function loadAccounts() {
+  try {
+    if (!fs.existsSync(ACCOUNTS_FILE)) return {};
+    const raw = fs.readFileSync(ACCOUNTS_FILE, 'utf-8');
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    console.error('Failed to load accounts store, starting empty.', e);
+    return {};
+  }
+}
+
+function saveAccounts(store) {
+  try {
+    fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(store, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('Failed to save accounts store.', e);
+  }
+}
+
+function hashPassword(password) {
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
+
 // In-memory cache, synced to disk on change
 let offlineStore = loadOfflineStore();
+let accountsStore = loadAccounts();
 
 function queueOfflineMessage(targetUserId, type, payload) {
   if (!targetUserId) return;
@@ -72,6 +101,7 @@ function deliverQueuedMessages(userId, ws) {
 
 wss.on('connection', (ws) => {
   let currentUserId = null;
+  let authenticated = false;
 
   ws.on('message', (data) => {
     try {
@@ -84,8 +114,45 @@ wss.on('connection', (ws) => {
       }
 
       // Handle Authentication / Registration
+      if (message.type === 'REGISTER') {
+        const { userId, password } = message;
+        if (!userId || !password) {
+          ws.send(JSON.stringify({ type: 'REGISTER_RESULT', success: false, reason: 'INVALID_INPUT' }));
+          return;
+        }
+
+        if (accountsStore[userId]) {
+          ws.send(JSON.stringify({ type: 'REGISTER_RESULT', success: false, reason: 'USER_EXISTS' }));
+          return;
+        }
+
+        accountsStore[userId] = { passwordHash: hashPassword(password) };
+        saveAccounts(accountsStore);
+        console.log(`Registered new user: ${userId}`);
+        ws.send(JSON.stringify({ type: 'REGISTER_RESULT', success: true }));
+        return;
+      }
+
       if (message.type === 'AUTH') {
         currentUserId = message.userId;
+        const password = message.password;
+
+        if (!currentUserId || !password) {
+          ws.send(JSON.stringify({ type: 'AUTH_RESULT', success: false, reason: 'INVALID_INPUT' }));
+          return;
+        }
+
+        const account = accountsStore[currentUserId];
+        if (!account) {
+          ws.send(JSON.stringify({ type: 'AUTH_RESULT', success: false, reason: 'NOT_REGISTERED' }));
+          return;
+        }
+
+        const isPasswordOk = account.passwordHash === hashPassword(password);
+        if (!isPasswordOk) {
+          ws.send(JSON.stringify({ type: 'AUTH_RESULT', success: false, reason: 'BAD_PASSWORD' }));
+          return;
+        }
 
         // Check if user is already connected
         if (clients.has(currentUserId)) {
@@ -99,8 +166,10 @@ wss.on('connection', (ws) => {
             oldWs.close();
           }
         }
+
         // Store connection with optional username
         clients.set(currentUserId, { ws, username: message.username });
+        authenticated = true;
         console.log(`User connected: ${currentUserId} (username: ${message.username || 'N/A'})`);
         
         // Send list of currently online users to the new user
@@ -115,12 +184,16 @@ wss.on('connection', (ws) => {
 
         // Broadcast presence
         broadcastStatus(currentUserId, 'online');
+
+        // Notify client auth success
+        ws.send(JSON.stringify({ type: 'AUTH_RESULT', success: true }));
         return;
       }
 
       // Handle P2P/Relay Message (Chat & Friend Signals)
       const RELAY_TYPES = ['CHAT', 'FRIEND_REQUEST', 'FRIEND_ACCEPT', 'FRIEND_REMOVE', 'MESSAGE_DELIVERED'];
       if (RELAY_TYPES.includes(message.type)) {
+        if (!authenticated) return; // Ignore relay attempts before auth
         const { targetUserId, payload } = message;
         const target = clients.get(targetUserId);
         const targetWs = target && target.ws;
@@ -144,6 +217,7 @@ wss.on('connection', (ws) => {
 
       // Handle user profile updates (e.g., nickname)
       if (message.type === 'USER_UPDATE') {
+        if (!authenticated) return;
         const userId = message.from;
         const { username } = message.payload || {};
         if (!userId || !username) return;
@@ -167,6 +241,19 @@ wss.on('connection', (ws) => {
             clientWs.send(broadcastMsg);
           }
         }
+        return;
+      }
+
+      if (message.type === 'CHANGE_PASSWORD') {
+        if (!authenticated) return;
+        const { newPassword } = message;
+        if (!newPassword || typeof newPassword !== 'string' || !newPassword.trim()) {
+          ws.send(JSON.stringify({ type: 'CHANGE_PASSWORD_RESULT', success: false, reason: 'INVALID_INPUT' }));
+          return;
+        }
+        accountsStore[currentUserId] = { passwordHash: hashPassword(newPassword) };
+        saveAccounts(accountsStore);
+        ws.send(JSON.stringify({ type: 'CHANGE_PASSWORD_RESULT', success: true }));
         return;
       }
 

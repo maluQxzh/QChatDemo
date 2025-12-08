@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import SettingsPage from './pages/SettingsPage';
+import RegisterPage from './pages/RegisterPage';
 import { storageService } from './services/storageService';
 
 const App: React.FC = () => {
@@ -21,6 +22,7 @@ const App: React.FC = () => {
     <HashRouter>
       <Routes>
         <Route path="/" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
         <Route path="/app" element={<Dashboard />} />
         <Route path="/settings" element={<SettingsPage />} />
         {/* Fallback */}

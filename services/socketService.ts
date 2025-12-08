@@ -13,6 +13,8 @@ type ForceLogoutHandler = () => void;
 type OnlineUsersListHandler = (userIds: string[]) => void;
 type DeliveryReceiptHandler = (messageId: string) => void;
 type UserUpdateHandler = (data: { userId: string; username: string }) => void;
+type AuthResultHandler = (result: { success: boolean; reason?: string }) => void;
+type ChangePasswordHandler = (result: { success: boolean; reason?: string }) => void;
 
 class SocketService {
   private state: ConnectionState = 'DISCONNECTED';
@@ -27,6 +29,8 @@ class SocketService {
   private onlineUsersListHandlers: Set<OnlineUsersListHandler> = new Set();
   private deliveryReceiptHandlers: Set<DeliveryReceiptHandler> = new Set();
     private userUpdateHandlers: Set<UserUpdateHandler> = new Set();
+    private authResultHandlers: Set<AuthResultHandler> = new Set();
+    private changePasswordHandlers: Set<ChangePasswordHandler> = new Set();
   
   // Cache for online users to handle race conditions
   private cachedOnlineUsers: Set<string> = new Set();
@@ -41,8 +45,10 @@ class SocketService {
   private wsUrl: string = ''; // Current URL for reference
 
   private currentUser: User | null = null;
+    private currentPassword: string | null = null;
     // Cache messages received before any UI handler is attached
     private earlyMessages: Message[] = [];
+    private changePasswordPending: Array<(res: { success: boolean; reason?: string }) => void> = [];
   
   getState(): ConnectionState {
       return this.state;
@@ -86,9 +92,10 @@ class SocketService {
       logger.info('Network', `Configured endpoints: ${JSON.stringify(this.endpointList)}`);
   }
 
-  connect(user: User) {
+    connect(user: User, password?: string) {
     if (this.state === 'CONNECTED') return;
     this.currentUser = user;
+        this.currentPassword = password || null;
     this.currentEndpointIndex = 0;
     
     // If no endpoints configured (shouldn't happen if configureServer called, but safety check)
@@ -175,7 +182,8 @@ class SocketService {
                   this.socket?.send(JSON.stringify({
                       type: 'AUTH',
                       userId: this.currentUser.id,
-                      username: this.currentUser.username
+                      username: this.currentUser.username,
+                      password: this.currentPassword || ''
                   }));
               }
           };
@@ -189,6 +197,21 @@ class SocketService {
                       logger.warn('Network', 'Received FORCE_LOGOUT');
                       this.disconnect();
                       this.forceLogoutHandlers.forEach(h => h());
+                      return;
+                  }
+
+                  if (data.type === 'AUTH_RESULT') {
+                      if (!data.success) {
+                          this.notifyAuthResult({ success: false, reason: data.reason });
+                          this.disconnect();
+                          return;
+                      }
+                      this.notifyAuthResult({ success: true });
+                      return;
+                  }
+
+                  if (data.type === 'CHANGE_PASSWORD_RESULT') {
+                      this.notifyChangePassword(data);
                       return;
                   }
 
@@ -274,6 +297,70 @@ class SocketService {
     this.cachedOnlineUsers.clear();
   }
 
+  async register(userId: string, password: string): Promise<{ success: boolean; reason?: string }> {
+      if (!userId || !password) {
+          return { success: false, reason: 'INVALID_INPUT' };
+      }
+
+      if (this.endpointList.length === 0) {
+          this.configureServer();
+      }
+
+      const tryEndpoint = (index: number): Promise<{ success: boolean; reason?: string }> => {
+          if (index >= this.endpointList.length) {
+              return Promise.resolve({ success: false, reason: 'CONNECTION_FAILED' });
+          }
+
+          return new Promise((resolve) => {
+              const url = this.endpointList[index];
+              let settled = false;
+              const ws = new WebSocket(url);
+
+              const timeout = setTimeout(() => {
+                  if (settled) return;
+                  settled = true;
+                  ws.close();
+                  resolve(tryEndpoint(index + 1));
+              }, 4000);
+
+              ws.onopen = () => {
+                  ws.send(JSON.stringify({ type: 'REGISTER', userId, password }));
+              };
+
+              ws.onmessage = (event) => {
+                  try {
+                      const data = JSON.parse(event.data);
+                      if (data.type === 'REGISTER_RESULT') {
+                          settled = true;
+                          clearTimeout(timeout);
+                          ws.close();
+                          resolve({ success: !!data.success, reason: data.reason });
+                      }
+                  } catch (_e) {
+                      // ignore parse errors
+                  }
+              };
+
+              ws.onerror = () => {
+                  if (settled) return;
+                  settled = true;
+                  clearTimeout(timeout);
+                  ws.close();
+                  resolve(tryEndpoint(index + 1));
+              };
+
+              ws.onclose = () => {
+                  if (settled) return;
+                  settled = true;
+                  clearTimeout(timeout);
+                  resolve(tryEndpoint(index + 1));
+              };
+          });
+      };
+
+      return tryEndpoint(0);
+  }
+
   async sendMessage(message: Message, recipientId: string) {
       if (this.socket?.readyState === WebSocket.OPEN) {
           this.socket.send(JSON.stringify({
@@ -329,6 +416,24 @@ class SocketService {
               payload: { userId: this.currentUser?.id }
           }));
       }
+  }
+
+  async changePassword(newPassword: string): Promise<{ success: boolean; reason?: string }> {
+      if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+          return { success: false, reason: 'DISCONNECTED' };
+      }
+      return new Promise((resolve) => {
+          this.changePasswordPending.push(resolve);
+          this.socket?.send(JSON.stringify({ type: 'CHANGE_PASSWORD', newPassword }));
+          setTimeout(() => {
+              // timeout safeguard
+              const idx = this.changePasswordPending.indexOf(resolve);
+              if (idx >= 0) {
+                  this.changePasswordPending.splice(idx, 1);
+                  resolve({ success: false, reason: 'TIMEOUT' });
+              }
+          }, 5000);
+      });
   }
 
   // --- User Profile Methods ---
@@ -406,6 +511,16 @@ class SocketService {
       return () => this.userUpdateHandlers.delete(handler);
   }
 
+  onAuthResult(handler: AuthResultHandler) {
+      this.authResultHandlers.add(handler);
+      return () => this.authResultHandlers.delete(handler);
+  }
+
+  onChangePassword(handler: ChangePasswordHandler) {
+      this.changePasswordHandlers.add(handler);
+      return () => this.changePasswordHandlers.delete(handler);
+  }
+
   private updateState(newState: ConnectionState) {
     this.state = newState;
     this.connectionHandlers.forEach(h => h(newState));
@@ -418,6 +533,20 @@ class SocketService {
             return;
         }
         this.messageHandlers.forEach(h => h(message));
+  }
+
+  private notifyAuthResult(result: { success: boolean; reason?: string }) {
+      this.authResultHandlers.forEach(h => h(result));
+  }
+
+  private notifyChangePassword(result: { success: boolean; reason?: string }) {
+      // Resolve pending promises
+      if (this.changePasswordPending.length > 0) {
+          this.changePasswordPending.forEach(resolver => resolver({ success: !!result.success, reason: result.reason }));
+          this.changePasswordPending = [];
+      }
+      // Notify listeners
+      this.changePasswordHandlers.forEach(h => h({ success: !!result.success, reason: result.reason }));
   }
 
   private startHeartbeat() {

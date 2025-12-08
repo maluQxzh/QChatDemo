@@ -193,6 +193,9 @@ ipcMain.handle('db:clear', async () => {
     await fileService.deleteFiles(imageFiles);
   }
 
+  // Also clear any remaining cached images to ensure full cleanup
+  await fileService.clearImages();
+
   // 2. Clear only chat-related tables (messages & conversations)
   dbService.clearUserChatsOnly?.();
 

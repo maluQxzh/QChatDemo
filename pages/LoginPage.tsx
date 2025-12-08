@@ -1,17 +1,19 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { socketService } from '../services/socketService';
 import { storageService } from '../services/storageService';
-import { ShieldCheck, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Loader2, AlertCircle, UserPlus } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState('');
+    const [password, setPassword] = useState('');
   const [serverHost, setServerHost] = useState('');
   const [serverPort, setServerPort] = useState('');
   const navigate = useNavigate();
+    const authResolvedRef = useRef(false);
 
   useEffect(() => {
       // Auto-fill last user
@@ -33,10 +35,14 @@ const LoginPage: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-        if(!userId.trim()) return;
+        if(!userId.trim() || !password.trim()) {
+            setError('请输入用户 ID 和密码');
+            return;
+        }
 
     setLoading(true);
     setError(null);
+    authResolvedRef.current = false;
     // Validate Host (IPv4 or Domain) and port if provided
     const hostTrim = serverHost.trim();
     const portTrim = serverPort.trim();
@@ -86,31 +92,50 @@ const LoginPage: React.FC = () => {
     }
 
     // Attempt Connection
-    socketService.connect(user);
-    
-    // Poll for connection status
-    const startTime = Date.now();
-    const checkInterval = setInterval(() => {
-        const state = socketService.getState();
-        if (state === 'CONNECTED') {
-            clearInterval(checkInterval);
+    let offAuth: () => void = () => {};
+    let offConn: () => void = () => {};
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const cleanup = () => {
+        offAuth();
+        offConn();
+        clearTimeout(timeoutId);
+    };
+
+    socketService.connect(user, password.trim());
+
+    offAuth = socketService.onAuthResult((result) => {
+        if (authResolvedRef.current) return;
+        authResolvedRef.current = true;
+        if (result.success) {
+            setLoading(false);
             navigate('/app');
-        } else if (state === 'DISCONNECTED') {
-            // Connection failed (all endpoints tried)
-            clearInterval(checkInterval);
+        } else {
+            setLoading(false);
+            const reason = result.reason === 'NOT_REGISTERED' ? '账号未注册，请先注册' : result.reason === 'BAD_PASSWORD' ? '密码错误' : '鉴权失败';
+            setError(reason);
+            socketService.disconnect();
+        }
+        cleanup();
+    });
+
+    offConn = socketService.onConnectionChange((state) => {
+        if (authResolvedRef.current) return;
+        if (state === 'DISCONNECTED') {
             setLoading(false);
             setError('连接服务器失败，请检查网络或确认服务端已启动。');
-            socketService.disconnect();
-        } else {
-            // Still CONNECTING... check timeout
-            if (Date.now() - startTime > 8000) { // 8 seconds max
-                clearInterval(checkInterval);
-                setLoading(false);
-                setError('连接超时，请稍后重试。');
-                socketService.disconnect();
-            }
+            cleanup();
         }
-    }, 200);
+    });
+
+    timeoutId = setTimeout(() => {
+        if (authResolvedRef.current) return;
+        authResolvedRef.current = true;
+        setLoading(false);
+        setError('连接或鉴权超时，请稍后重试');
+        socketService.disconnect();
+        cleanup();
+    }, 10000);
   };
 
   return (
@@ -144,6 +169,18 @@ const LoginPage: React.FC = () => {
                         required
                     />
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">好友需要通过此 ID 添加你。</p>
+                </div>
+
+                <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">密码</label>
+                    <input 
+                        type="password" 
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="请输入密码"
+                        className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all text-slate-700"
+                        required
+                    />
                 </div>
 
                 {/* Signaling Server Address (last section, IPv4 or Domain) */}
@@ -189,6 +226,14 @@ const LoginPage: React.FC = () => {
                     className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
                 >
                     {loading ? <Loader2 className="animate-spin" size={20} /> : <>登录 <ArrowRight size={20} /></>}
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => navigate('/register')}
+                    className="w-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-600"
+                >
+                    <UserPlus size={18} /> 注册新账号
                 </button>
             </form>
         </div>
