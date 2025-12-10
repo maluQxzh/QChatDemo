@@ -72,52 +72,52 @@ app.on('window-all-closed', () => {
 // --- IPC Handlers (Backend Logic) ---
 
 // Auth: Switch Storage File (SQLite per-user DB)
-ipcMain.handle('auth:login', (event, userId) => {
+ipcMain.handle('auth:login', async (event, userId) => {
   if (!userId) return false;
 
   const safeId = userId.replace(/[^a-z0-9_-]/gi, '_');
   const fileName = `user_${safeId}${isDev ? '_dev' : ''}`;
 
   console.log(`[Main] Switching storage to SQLite DB: ${fileName}`);
-  dbService.openUserDb(fileName);
+  await dbService.openUserDb(fileName);
   return true;
 });
 
-ipcMain.handle('auth:logout', () => {
+ipcMain.handle('auth:logout', async () => {
   console.log('[Main] Logging out, closing user DB');
-  dbService.closeUserDb();
+  await dbService.closeUserDb();
   return true;
 });
 
 // Get Data
-ipcMain.handle('db:get', (event, key) => {
+ipcMain.handle('db:get', async (event, key) => {
   if (key === 'orbit_current_user') {
-    return dbService.getGlobal(key);
+    return await dbService.getGlobal(key);
   }
 
   if (key === 'orbit_users') {
     // Per-user profile map (id -> User), stored in global KV
-    return dbService.getGlobal(key) || {};
+    return (await dbService.getGlobal(key)) || {};
   }
 
   // Per-user structured data
   if (key === 'orbit_settings') {
-    return dbService.getSettings();
+    return await dbService.getSettings();
   }
   if (key === 'orbit_contacts') {
-    return dbService.getContacts();
+    return await dbService.getContacts();
   }
   if (key === 'orbit_friend_requests') {
-    return dbService.getFriendRequests();
+    return await dbService.getFriendRequests();
   }
     if (key === 'orbit_messages') {
       // Return all messages for compatibility (renderer will filter by conversationId)
-      return dbService.getAllMessages();
+      return await dbService.getAllMessages();
     }
     if (key === 'orbit_conversations') {
         // Reconstruct as array including lastMessage object, if resolvable
-        const convos = dbService.getConversations();
-        const allMessages = dbService.getAllMessages();
+        const convos = await dbService.getConversations();
+        const allMessages = await dbService.getAllMessages();
         const byId = new Map();
         for (const m of allMessages) {
           byId.set(m.id, m);
@@ -132,57 +132,59 @@ ipcMain.handle('db:get', (event, key) => {
     }
 
   // Fallback for unstructured keys (not expected now)
-  const userVal = dbService.getUser(key);
+  const userVal = await dbService.getUser(key);
   if (userVal !== null && userVal !== undefined) return userVal;
   return dbService.getGlobal(key);
 });
 
 // Set Data
-ipcMain.handle('db:set', (event, { key, value }) => {
+ipcMain.handle('db:set', async (event, { key, value }) => {
   if (key === 'orbit_current_user') {
-    dbService.setGlobal(key, value);
+    await dbService.setGlobal(key, value);
     return true;
   }
   if (key === 'orbit_users') {
-    dbService.setGlobal(key, value || {});
+    await dbService.setGlobal(key, value || {});
     return true;
   }
   if (key === 'orbit_settings') {
-    dbService.setSettingsKey('app', value);
+    await dbService.setSettingsKey('app', value);
     return true;
   }
   if (key === 'orbit_contacts') {
-    dbService.setContacts(value || []);
+    await dbService.setContacts(value || []);
     return true;
   }
   if (key === 'orbit_friend_requests') {
     // storageService 目前是整表覆盖或按单条操作，这里只支持整表覆盖场景
     // 为简单起见，这里直接清空并逐条 upsert
     if (Array.isArray(value)) {
-      value.forEach(req => dbService.upsertFriendRequest(req));
+      for (const req of value) {
+        await dbService.upsertFriendRequest(req);
+      }
     }
     return true;
   }
     if (key === 'orbit_messages') {
-      dbService.replaceAllMessages(value || []);
+      await dbService.replaceAllMessages(value || []);
       return true;
     }
     if (key === 'orbit_conversations') {
-      dbService.replaceAllConversations(value || []);
+      await dbService.replaceAllConversations(value || []);
       return true;
     }
 
-  const ok = dbService.setUser(key, value);
+  const ok = await dbService.setUser(key, value);
   if (ok) return true;
 
-  dbService.setGlobal(key, value);
+  await dbService.setGlobal(key, value);
   return true;
 });
 
 // Clear Data
 ipcMain.handle('db:clear', async () => {
   // 1. Find all images belonging to this user from messages in SQLite
-  const allMessages = dbService.getAllMessages();
+  const allMessages = await dbService.getAllMessages();
   const imageFiles = Array.isArray(allMessages)
     ? allMessages
       .filter(m => m && m.type === 'IMAGE' && m.content && typeof m.content === 'string' && !m.content.startsWith('data:'))
@@ -197,23 +199,23 @@ ipcMain.handle('db:clear', async () => {
   await fileService.clearImages();
 
   // 2. Clear only chat-related tables (messages & conversations)
-  dbService.clearUserChatsOnly?.();
+  await dbService.clearUserChatsOnly?.();
 
   return true;
 });
 
 // Fine-grained DB operations for Electron renderer
-ipcMain.handle('db:messages-by-conversation', (event, conversationId) => {
-  return dbService.getMessagesByConversation(conversationId);
+ipcMain.handle('db:messages-by-conversation', async (event, conversationId) => {
+  return await dbService.getMessagesByConversation(conversationId);
 });
 
-ipcMain.handle('db:message-upsert', (event, message) => {
-  dbService.upsertMessage(message);
+ipcMain.handle('db:message-upsert', async (event, message) => {
+  await dbService.upsertMessage(message);
   return true;
 });
 
-ipcMain.handle('db:conversation-update-last', (event, { conversationId, message, currentUserId }) => {
-  const convos = dbService.getConversations();
+ipcMain.handle('db:conversation-update-last', async (event, { conversationId, message, currentUserId }) => {
+  const convos = await dbService.getConversations();
   let convo = convos.find(c => c.id === conversationId) || null;
 
   if (convo) {
@@ -235,12 +237,12 @@ ipcMain.handle('db:conversation-update-last', (event, { conversationId, message,
     };
   }
 
-  dbService.upsertConversation(convo);
+  await dbService.upsertConversation(convo);
   return true;
 });
 
-ipcMain.handle('db:conversation-create', (event, { participantId, currentUserId }) => {
-  const convos = dbService.getConversations();
+ipcMain.handle('db:conversation-create', async (event, { participantId, currentUserId }) => {
+  const convos = await dbService.getConversations();
   const existing = convos.find(c => c.participantId === participantId);
   if (existing) return existing.id;
 
@@ -248,7 +250,7 @@ ipcMain.handle('db:conversation-create', (event, { participantId, currentUserId 
   const newId = `convo_${ids[0]}_${ids[1]}`;
   const now = Date.now();
 
-  dbService.upsertConversation({
+  await dbService.upsertConversation({
     id: newId,
     participantId,
     unreadCount: 0,
@@ -259,28 +261,28 @@ ipcMain.handle('db:conversation-create', (event, { participantId, currentUserId 
   return newId;
 });
 
-ipcMain.handle('db:conversation-mark-read', (event, conversationId) => {
-  const convos = dbService.getConversations();
+ipcMain.handle('db:conversation-mark-read', async (event, conversationId) => {
+  const convos = await dbService.getConversations();
   const existing = convos.find(c => c.id === conversationId);
   if (!existing) return true;
   existing.unreadCount = 0;
-  dbService.upsertConversation(existing);
+  await dbService.upsertConversation(existing);
   return true;
 });
 
-ipcMain.handle('db:convo-delete-by-participant', (event, participantId) => {
-  dbService.deleteConversationByParticipant(participantId);
+ipcMain.handle('db:convo-delete-by-participant', async (event, participantId) => {
+  await dbService.deleteConversationByParticipant(participantId);
   return true;
 });
 
 // Friend requests fine-grained operations
-ipcMain.handle('db:friend-request-upsert', (event, request) => {
-  dbService.upsertFriendRequest(request);
+ipcMain.handle('db:friend-request-upsert', async (event, request) => {
+  await dbService.upsertFriendRequest(request);
   return true;
 });
 
-ipcMain.handle('db:friend-request-remove-by-userId', (event, userId) => {
-  dbService.removeFriendRequestByUserId(userId);
+ipcMain.handle('db:friend-request-remove-by-userId', async (event, userId) => {
+  await dbService.removeFriendRequestByUserId(userId);
   return true;
 });
 
